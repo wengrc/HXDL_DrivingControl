@@ -1,0 +1,4 @@
+---- evRunTest Matches (3 in 3 files) ----
+AgvCar.cpp (controler):873:    case evRunTest:
+AgvEvent.h (event):75:    evRunTest,              //ÐÐ×ß²âÊÔ
+AgvScheduler.cpp (controler):359:                SendEvent(evRunTest, 0, info);

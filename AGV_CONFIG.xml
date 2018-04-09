@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfg>
+  <ID>0</ID>
+  <Speed>500</Speed>
+  <Max_Angle>90000</Max_Angle>
+  <Torsion>1000</Torsion>
+  <Sonic_Near_Distance>300</Sonic_Near_Distance>
+  <Sonic_Mid_Distance>600</Sonic_Mid_Distance>
+  <Sonic_Far_Distance>800</Sonic_Far_Distance>
+  <Led_Number_System>3</Led_Number_System>
+  <Mute>0</Mute>
+  <Speed_Cursor0>500</Speed_Cursor0>
+  <Speed_Cursor1>500</Speed_Cursor1>
+  <Speed_Cursor2>500</Speed_Cursor2>
+  <Speed_Cursor3>500</Speed_Cursor3>
+  <Speed_Cursor4>500</Speed_Cursor4>
+  <Speed_Cursor5>500</Speed_Cursor5>
+  <Speed_Cursor6>500</Speed_Cursor6>
+  <Speed_Cursor7>500</Speed_Cursor7>
+  <Speed_Cursor8>500</Speed_Cursor8>
+  <Speed_Cursor9>500</Speed_Cursor9>
+  <Speed_Cursor10>500</Speed_Cursor10>
+  <Speed_Cursor11>500</Speed_Cursor11>
+  <Speed_Cursor12>500</Speed_Cursor12>
+  <Speed_Cursor13>500</Speed_Cursor13>
+  <Speed_Cursor14>500</Speed_Cursor14>
+  <Speed_Cursor15>500</Speed_Cursor15>
+  <Speed_Cursor16>500</Speed_Cursor16>
+  <Speed_Cursor17>500</Speed_Cursor17>
+  <Speed_Cursor18>500</Speed_Cursor18>
+  <Speed_Cursor19>500</Speed_Cursor19>
+  <Speed_Cursor20>500</Speed_Cursor20>
+  <Speed_Cursor21>500</Speed_Cursor21>
+  <Speed_Cursor22>500</Speed_Cursor22>
+  <Speed_Cursor23>500</Speed_Cursor23>
+  <Speed_Cursor24>500</Speed_Cursor24>
+  <Speed_Cursor25>500</Speed_Cursor25>
+  <Speed_Cursor26>500</Speed_Cursor26>
+  <Speed_Cursor27>500</Speed_Cursor27>
+  <Speed_Cursor28>500</Speed_Cursor28>
+  <Speed_Cursor29>500</Speed_Cursor29>
+  <Speed_Cursor30>500</Speed_Cursor30>
+  <Speed_Cursor31>500</Speed_Cursor31>
+  <AVOID_Near_Distance>500</AVOID_Near_Distance>
+  <AVOID_Mid_Distance>800</AVOID_Mid_Distance>
+  <AVOID_Far_Distance>1000</AVOID_Far_Distance>
+</cfg>
