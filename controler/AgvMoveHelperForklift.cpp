@@ -445,38 +445,28 @@ int CAgvMoveHelperForklift::LoopRunning()
     return 0;
 }
 
+#define ForwardInitDefaultSpeed 300//mm/s
 #define GoChargeSpeed_mm_s 100
-#define FinalDelay_DISTANCE 40 //40 is OK
-//#define SpeedFinalFinal 45//1#che:45 //2#che:35
-//#define Kdistance 0.65;//1#che:0.65 //2#che:0.75
+#define FinalDelayDefault_DISTANCE 40 //40 is OK
 int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
 {
     static runMode mode = lowSpeedMode;
-
     static POSE lastPose = {0, 0 , 0.0};
     static bool arrivingFlag = false;
     static int savedTargetSpeed = 0;
-
     int distance;
     int runDistance;
-    int SpeedFinalFinal;
-    float Kdistance;
-
-
     float angleDiff;
 
     POSE tempPose = currentpose;
-
     currentpose = agvMathUtils->transformPose(currentpose, -LIDAR_TO_TAIL_LENGTH);
     targetpose = agvMathUtils->transformPose(targetpose, -LIDAR_TO_TAIL_LENGTH);
 
     currentpose = agvMathUtils->transformCoordinate(targetpose, currentpose);
     currentpose.angle = agvMathUtils->transformAngle(currentpose.angle, -ANGLE_360_DEGREE, ANGLE_360_DEGREE, ANGLE_180_DEGREE);
 
-
     if(false == initParaFlag)
     {
-
         printf("\n~~~~~~~\n~~~~~~~\n  ForwardToLine-start__startPose: (%d, %d, %f)\n", tempPose.xPos, tempPose.yPos, tempPose.angle);
 
         //check if the start point ahead of the target
@@ -487,38 +477,10 @@ int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
         }
         else
         {
-
-            savedTargetSpeed = targetSpeed;
-
-            if(s_Controler->speed > savedTargetSpeed && s_Controler->speed < 65536/2)
-            {
-                currentLinearSpeed = savedTargetSpeed;
-                mode = highSpeedMode;
-            }
-            else if(s_Controler->speed > initSpeed*3 && s_Controler->speed < 65536/2)
-            {
-                currentLinearSpeed = s_Controler->speed;//wrc:keep speed
-                mode = lowSpeedMode;
-            }
-            else
-            {
-                currentLinearSpeed = initSpeed*3;
-                mode = lowSpeedMode;
-            }
-
-            if(ActionCharge == targetPoint.action)
-            {
-                currentLinearSpeed = GoChargeSpeed_mm_s;
-                savedTargetSpeed = currentLinearSpeed;
-                mode = lowSpeedMode;
-            }            
-
-            baseAngularSpeed = 0.0;
-            currentAngularSpeed = 0.0;
+            forwardSpeedInit(&savedTargetSpeed, &mode);
 
             int ret1 = s_Controler->SetDirection(0);
             int ret2 = s_Controler->SetBreak(false);
-
             int ret3 = controler->SetCarSpeed(currentLinearSpeed, currentAngularSpeed);
             if(ret1 != 0 || ret2 != 0 || ret3 != 0 )
             {
@@ -543,45 +505,10 @@ int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
     else
     {
         int finalDelayDistance;
-        int absSpeed;
-        if(s_Controler->speed > 65536/2)
-        {
-             absSpeed =  65536-s_Controler->speed;
-        }
-        else
-        {
-            absSpeed = s_Controler->speed;
-        }
-        if( 1001 == carID)
-        {
-            SpeedFinalFinal = 45;//1#che:45 //2#che:35
-            Kdistance = 0.65;//1#che:0.65 //2#che:0.75
-        }
-        else
-        {
-            SpeedFinalFinal = 35;//1#che:45 //2#che:35
-            Kdistance = 0.75;//1#che:0.65 //2#che:0.75
-        }
+        int SpeedFinalFinal;
+        float Kdistance;
 
-        if(ActionCharge ==targetPoint.action)
-        {
-            if(abs(currentLinearSpeed) < 65)
-            {
-                finalDelayDistance = absSpeed * Kdistance;
-            }
-            else
-            {
-                finalDelayDistance = FinalDelay_DISTANCE;
-            }
-        }
-        else
-        {
-            finalDelayDistance = fabs((float)DELAY_DISTANCE_OFFSET/ (float)BASE_LINEAR_SPEED * absSpeed);
-            if(finalDelayDistance > 2*DELAY_DISTANCE_OFFSET)
-            {
-                finalDelayDistance = 2*DELAY_DISTANCE_OFFSET;
-            }
-        }
+        finalDelayDistance = calFinalDelayDis(&SpeedFinalFinal, &Kdistance);
 
         //check if the agv reach the target point
         if(currentpose.xPos >= (0 - finalDelayDistance))
@@ -599,41 +526,27 @@ int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
         else if( (currentpose.xPos >= (0 - DISTANCE_100_MM*5)) &&
                  (ActionCharge == targetPoint.action))
         {
-            //printf("finalDelayDistance is %d.\n",finalDelayDistance);
-            //printf("currentpose.xPos:%d.\n", currentpose.xPos);
-
             targetSpeed = (float)(abs(currentpose.xPos))/DISTANCE_100_MM/5 * BASE_LINEAR_SPEED + SpeedFinalFinal;
             currentLinearSpeed = targetSpeed;
             arrivingFlag = true;
             mode = lowSpeedMode;
         }
         else if(currentpose.xPos >= (0 - DISTANCE_100_MM*8)&&
-                (ActionStop == targetPoint.action))
+                (ActionStop == targetPoint.action || ActionLiftUpDown == targetPoint.action))
         {
-
             targetSpeed = ( 2*(float)(abs(currentpose.xPos))/DISTANCE_1000_MM + 1.4 )*BASE_LINEAR_SPEED;
             currentLinearSpeed = targetSpeed;
             arrivingFlag = true;
             mode = lowSpeedMode;
         }
-        else if(currentpose.xPos >= (0 - DISTANCE_1000_MM*2.2)&&
-                (ActionCharge == targetPoint.action))
-        {
-            targetSpeed = GoChargeSpeed_mm_s;
-            currentLinearSpeed = targetSpeed;
-            arrivingFlag = true;
-            mode = lowSpeedMode;
-        }
-
 
         //run forward following the line
         angleDiff = agvMathUtils->getAngleDiff(currentpose.angle, 0.0);
         distance = (int)currentpose.yPos;
-        //printf("AngleDiff:%f,distance:%d.\n",angleDiff,distance);
 
         if(false == arrivingFlag)
         {
-            int refereceDistance = abs(DISTANCE_10_MM * currentLinearSpeed / BASE_LINEAR_SPEED * 26);//28//25//32//42//84//wrc: when agv is near the point
+            int refereceDistance = abs(DISTANCE_10_MM * currentLinearSpeed / BASE_LINEAR_SPEED * 26);
             if(currentpose.xPos > (0-refereceDistance))//when near the target, slow down
             {
                 if(ActionCharge == targetPoint.action || ActionLiftUpDown == targetPoint.action
@@ -641,7 +554,7 @@ int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
                 {
                     targetSpeed = BASE_LINEAR_SPEED*2;
 
-                    //wrc: calculate deceleration: control period is about 0.25s, so deceleration unit is m/s/0.25s
+                    //wrc: calculate deceleration: control period is about 0.05s, so deceleration unit is about m/s/0.05s
                     dspeed = (int) ((currentLinearSpeed*currentLinearSpeed-targetSpeed*targetSpeed)/abs(2*currentpose.xPos));//uniformly retarded motion
                     dspeed = (int) (dspeed * 0.09);//0.15//change from 0.12--0320//0.10--0321
                 }
@@ -672,14 +585,12 @@ int CAgvMoveHelperForklift::ForwardToLine(POSE currentpose, POSE targetpose)
         }
 
         runDistance = (int)agvMathUtils->getDistanceBetweenPose(currentpose, lastPose);
-
         //control the two wheels when the control period comes
-        if(runDistance > DISTANCE_10_MM * currentLinearSpeed / BASE_LINEAR_SPEED /2)//wrc: control time period is 0.1s?(actually about 0.25s)
+
+        if(runDistance > DISTANCE_10_MM * currentLinearSpeed / BASE_LINEAR_SPEED /2)//wrc: control time period is about 0.05s
         {
             printf("\n*****************************************\nRunDistance:%d.  ", runDistance);
-
             ManageWheelSpeed();
-
             wheelControl(distance, angleDiff);
             lastPose = currentpose;
         }
@@ -709,8 +620,7 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
 
     int distance;
     int runDistance;
-    int SpeedFinalFinal;
-    float Kdistance;
+
 
     float angleDiff;
     POSE tempPose = currentpose;
@@ -734,7 +644,6 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
         }
         else
         {
-
             currentLinearSpeed = -backwardSpeedInit;
             //savedTargetSpeed = targetSpeed;
             targetSpeed = -backwardTargetSpeedInit;//20171225
@@ -766,48 +675,11 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
         }
     }
     else
-    {
+    {   int SpeedFinalFinal;
+        float Kdistance;
         int finalDelayDistance;
-        int absSpeed;
-        if(s_Controler->speed > 65536/2)
-        {
-             absSpeed = 65536-s_Controler->speed;
-        }
-        else
-        {
-            absSpeed = s_Controler->speed;
-        }
 
-        if( 1001 == carID)
-        {
-            SpeedFinalFinal = 45;//1#che:45 //2#che:35
-            Kdistance = 0.65;//1#che:0.65 //2#che:0.75
-        }
-        else
-        {
-            SpeedFinalFinal = 35;//1#che:45 //2#che:35
-            Kdistance = 0.75;//1#che:0.65 //2#che:0.75
-        }
-
-        if(ActionLiftUpDown ==targetPoint.action)
-        {
-            if(abs(currentLinearSpeed) < 65)
-            {
-                finalDelayDistance = absSpeed* Kdistance;//0.65//0.75
-            }
-            else
-            {
-                finalDelayDistance = FinalDelay_DISTANCE;
-            }
-        }
-        else
-        {
-            finalDelayDistance = fabs((float)DELAY_DISTANCE_OFFSET/ (float)BASE_LINEAR_SPEED * absSpeed);
-            if(finalDelayDistance > 2*DELAY_DISTANCE_OFFSET)
-            {
-                finalDelayDistance = 2*DELAY_DISTANCE_OFFSET;
-            }
-        }
+        finalDelayDistance = calFinalDelayDis(&SpeedFinalFinal, &Kdistance);
 
         //check if the agv reach the target point
         if(currentpose.xPos <= (0 + finalDelayDistance))//20171225
@@ -821,11 +693,10 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
             isChangeSpeedInit = false;
             arrivingFlag = false;
 
-            {
             POSE tempPose = GetCurrentPose();//WRC
             printf("target pose: (%d %d %f) ", targetPose.xPos, targetPose.yPos, targetPose.angle);
             printf("current pose: (%d %d %f)\n", tempPose.xPos, tempPose.yPos, tempPose.angle);
-            }
+
             if (ActionLiftUpDown ==targetPoint.action)
             {
                 controler->StopCar(true);
@@ -859,7 +730,6 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
                 arrivingFlag = true;
                 mode = lowSpeedMode;
             }
-
         }
 
         runDistance = (int)agvMathUtils->getDistanceBetweenPose(currentpose, lastPose);
@@ -867,9 +737,7 @@ int CAgvMoveHelperForklift::BackwardToLine(POSE currentpose, POSE targetpose)
         if(runDistance > DISTANCE_10_MM * abs(currentLinearSpeed) / BASE_LINEAR_SPEED/2)
         {
             printf("\n*****************************************\nRunDistance:%d.  ", runDistance);
-
             ManageWheelSpeed();
-            //fuzzy control the motor speed
             wheelControl(distance, angleDiff);
             lastPose = currentpose;
         }
@@ -991,7 +859,6 @@ int CAgvMoveHelperForklift::ForwardToArc(POSE currentpose, POSE targetpose)
             }
         }
 
-
         float runAngle = fabs(currentpose.angle - lastPose.angle);
         runDistance = (int)agvMathUtils->getDistanceBetweenPose(currentpose, lastPose);
         //control the two wheels when the control period comes
@@ -1006,17 +873,9 @@ int CAgvMoveHelperForklift::ForwardToArc(POSE currentpose, POSE targetpose)
             lastPose = currentpose;
         }
 
-        int finalDelayDistance;
         int absSpeed;
-        if(s_Controler->speed > 65536/2)
-        {
-             absSpeed =  65536-s_Controler->speed;
-        }
-        else
-        {
-            absSpeed = s_Controler->speed;
-        }
-
+        int finalDelayDistance;
+        absSpeed = getAbsSpeed();
         finalDelayDistance = fabs((float)DELAY_DISTANCE_OFFSET/ (float)BASE_LINEAR_SPEED * absSpeed);
         if(finalDelayDistance > 2*DELAY_ARC_DISTANCE_OFFSET)
         {
@@ -1177,17 +1036,9 @@ int CAgvMoveHelperForklift::BackwardToArc(POSE currentpose, POSE targetpose)
             lastPose = currentpose;
         }        
 
-        int finalDelayDistance;
         int absSpeed;
-        if(s_Controler->speed > 65536/2)
-        {
-             absSpeed =  65536-s_Controler->speed;
-        }
-        else
-        {
-            absSpeed = s_Controler->speed;
-        }
-
+        int finalDelayDistance;
+        absSpeed = getAbsSpeed();
         finalDelayDistance = fabs((float)DELAY_DISTANCE_OFFSET/ (float)BASE_LINEAR_SPEED * absSpeed);
         if(finalDelayDistance > 2*DELAY_ARC_DISTANCE_OFFSET)
         {
@@ -1546,14 +1397,8 @@ void CAgvMoveHelperForklift::ManageWheelSpeed()
         printf("target speed: %d, current linear speed: %d, s_controler->speed:%d.\n", targetSpeed, currentLinearSpeed, s_Controler->speed);
     }
 
-    if(s_Controler->speed > 65536/2)
-    {
-        printf("Speed: (%d, %d), (%d, %d).  s_controler->speed:-%d.\n", currentLinearSpeed, targetSpeed, aspeed, dspeed, 65536-s_Controler->speed);
-    }
-    else
-    {
-        printf("Speed: (%d, %d), (%d, %d).  s_controler->speed:%d.\n", currentLinearSpeed, targetSpeed, aspeed, dspeed, s_Controler->speed);
-    }
+    int absSpeed = getAbsSpeed();
+    printf("Speed: (%d, %d), (%d, %d). absSpeed:%d.\n", currentLinearSpeed, targetSpeed, aspeed, dspeed, absSpeed);
 
 }
 
@@ -1747,6 +1592,100 @@ int CAgvMoveHelperForklift::calTargetSpeedByPathDistance(int distance)
 
     return speed;
 }
+
+void CAgvMoveHelperForklift::forwardSpeedInit(int *savedTargetSpeed, runMode *mode)
+{
+    if(ActionCharge == targetPoint.action)
+    {
+        targetSpeed = GoChargeSpeed_mm_s;
+        currentLinearSpeed = GoChargeSpeed_mm_s;
+        *savedTargetSpeed = GoChargeSpeed_mm_s;
+        *mode = lowSpeedMode;
+    }
+    else
+    {
+        if(s_Controler->speed > *savedTargetSpeed && s_Controler->speed < 65536/2)
+        {
+            *mode = highSpeedMode;
+            currentLinearSpeed = *savedTargetSpeed;
+        }
+        else if(s_Controler->speed > ForwardInitDefaultSpeed && s_Controler->speed < 65536/2)
+        {
+            *mode = lowSpeedMode;
+            currentLinearSpeed = s_Controler->speed;//wrc:keep speed
+        }
+        else
+        {
+            *mode = lowSpeedMode;
+            currentLinearSpeed = ForwardInitDefaultSpeed;
+        }
+    }
+
+    baseAngularSpeed = 0.0;
+    currentAngularSpeed = 0.0;
+}
+
+int CAgvMoveHelperForklift::calFinalDelayDis(int *SpeedFinalFinal, float *Kdistance)
+{
+    int absSpeed;
+    int finalDelayDistance;
+    if( 1001 == carID)
+    {
+        *SpeedFinalFinal = 45;//1#che:45 //2#che:35
+        *Kdistance = 0.65;//1#che:0.65 //2#che:0.75
+    }
+    else
+    {
+        *SpeedFinalFinal = 35;//1#che:45 //2#che:35
+        *Kdistance = 0.75;//1#che:0.65 //2#che:0.75
+    }
+
+    if(s_Controler->speed > 65536/2)
+    {
+         absSpeed =  65536-s_Controler->speed;
+    }
+    else
+    {
+        absSpeed = s_Controler->speed;
+    }
+
+    if((ActionCharge ==targetPoint.action && GoForwardMode == runningMode ) ||
+        (ActionLiftUpDown ==targetPoint.action && GoBackwardMode == runningMode))
+    {
+        if(abs(currentLinearSpeed) < 65)
+        {
+            finalDelayDistance = absSpeed * (*Kdistance);
+        }
+        else
+        {
+            finalDelayDistance = FinalDelayDefault_DISTANCE;
+        }
+    }
+    else
+    {
+        finalDelayDistance = fabs((float)DELAY_DISTANCE_OFFSET/ (float)BASE_LINEAR_SPEED * absSpeed);
+        if(finalDelayDistance > 2*DELAY_DISTANCE_OFFSET)
+        {
+            finalDelayDistance = 2*DELAY_DISTANCE_OFFSET;
+        }
+    }
+    return finalDelayDistance;
+}
+
+int CAgvMoveHelperForklift::getAbsSpeed(void)
+{
+    int absSpeed;
+    if(s_Controler->speed > 65536/2)
+    {
+         absSpeed =  65536-s_Controler->speed;
+    }
+    else
+    {
+        absSpeed = s_Controler->speed;
+    }
+    return absSpeed;
+}
+
 
 void CAgvMoveHelperForklift::clearSubpath(void)
 {

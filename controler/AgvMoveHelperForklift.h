@@ -132,6 +132,12 @@ class CAgvMoveHelperForklift : public CAgvMoveHelper
 
         int calDspeed();
 
+        void forwardSpeedInit(int *savedTargetSpeed, runMode *mode);
+
+        int calFinalDelayDis(int *SpeedFinalFinal, float *Kdistance);
+
+        int getAbsSpeed(void);
+
     private:
         int         pathIndex;
         bool        initParaFlag;
